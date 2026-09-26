@@ -215,7 +215,7 @@ Turn a stack of scanned answer sheets into per-student answer JSON (`{"Q1": "A",
 |---|---|
 | `backend/src/routes/evaluation.ts` | `/api/icr/*` routes, provider config, `runCloudOcrOnImage()` |
 | `ai-services/scripts/pdf_rasterize.py` | the **only** Python the backend invokes |
-| `backend/src/routes/diagnosticBulk.ts` | answer-key endpoints: `/api/diagnostic/student/:id/answer-key`, `/api/diagnostic/class/:n/answer-key` |
+| `backend/src/routes/diagnosticBulk.ts` | answer-key endpoints: `GET /api/diagnostic/student/:studentId/answer-key`, `GET /api/diagnostic/class/:classNumber/answer-key` |
 
 ### AI / LLM involvement
 
