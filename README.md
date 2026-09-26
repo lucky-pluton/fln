@@ -9,6 +9,7 @@ A large-scale, personalized assessment system that helps teachers measure, track
 - [Why FLN Matters](#why-fln-matters)
 - [Initiatives](#initiatives)
 - [What This Software Does](#what-this-software-does)
+- [Curriculum & Level Framework](#curriculum--level-framework)
 - [How It Works (Workflow)](#how-it-works-workflow)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -20,7 +21,7 @@ A large-scale, personalized assessment system that helps teachers measure, track
 
 ## What is FLN?
 
-**Foundational Literacy and Numeracy (FLN)** refers to the basic ability to read with comprehension and perform simple arithmetic operations — the core skills every child needs before they can meaningfully engage with the rest of their school curriculum. It typically covers children from pre-school through Grade 3 (roughly ages 3–9), and includes skills like letter and word recognition, reading fluency, basic comprehension, number sense, and elementary arithmetic.
+**Foundational Literacy and Numeracy (FLN)** refers to the basic ability to read with comprehension and perform simple arithmetic operations — the core skills every child needs before they can meaningfully engage with the rest of their school curriculum. This platform covers the **Mathematics (numeracy) half only**, from the **Balvatika / Foundational Stage (Preschool 1–3, ages 3–6) through Class 4 (ages 9–10)**, and includes skills like number sense, counting, spatial sense, measurement, patterns, and elementary arithmetic. See [Curriculum & Level Framework](#curriculum--level-framework) for how that range is expressed as levels.
 
 FLN is considered the "foundation" of all future learning — without it, a child cannot effectively progress through later grades, no matter how good the rest of the curriculum is.
 
@@ -59,6 +60,45 @@ The platform is built around **personalized, student-specific assessment**, not 
   - If a student **does not clear** it → they receive a detailed analysis of which FLN level they're actually at, along with a scheduled re-assessment date for the appropriate (lower) level.
   - Students who clear a lower-level re-assessment go on to attempt the FLN qualifier for their original grade again — every subsequent paper is generated from their updated, personalized profile.
 
+## Curriculum & Level Framework
+
+A child's FLN standing is a position on a **93-level curriculum**, not a grade. The taxonomy is **Balvatika-first**: it is built outward from the Balvatika (age 5–6) exit competency, and the build order runs Balvatika → Class 1 → Class 2 → Class 3 → Class 4.
+
+| Stage | Band | Ages | Levels | Concept IDs | Testable | Oral-only |
+|---|---|---|---|---|---|---|
+| 1 | Preschool 1 | 3–4 | 1–7 | S1.1–S1.7 | 7 | 0 |
+| 2 | Preschool 2 | 4–5 | 8–17 | S2.1–S2.10 | 10 | 0 |
+| 3 | Preschool 3 / **Balvatika** | 5–6 | 18–27 | S3.1–S3.10 | 10 | 0 |
+| 4 | Class 1 | 6–7 | 28–42 | S4.1–S4.15 | 15 | 1 (poems) |
+| 5 | Class 2 | 7–8 | 43–61 | S5.1–S5.19 | 19 | 1 (riddles) |
+| 6 | Class 3 (★ MPL) | 8–9 | 62–75 | S6.1–S6.14 | 14 | 0 |
+| 7 | Class 4 | 9–10 | 76–93 | S7.1–S7.18 | 18 | 0 |
+| | | | **1–93** | **S1.1–S7.18** | **93** | **2** |
+
+*(Stage boundaries and counts are taken verbatim from [`Research/fln_level_networks.md`](Research/fln_level_networks.md) Part 1, and match `backend/src/config/curriculumMap.ts` — 93 levels, 93 unique concept IDs.)*
+
+Five things about this framework are worth knowing before you touch it. Four are settled decisions; the fifth is an open question that is *deliberately* left open, and must stay that way:
+
+- **The count is not fixed.** 93 is a real count from decomposing the research into ten strand-chains, not a target — the research says so explicitly. Nothing should hardcode it. Read the count from the registry.
+- **One concept = one level = one graph node.** `S1.1`–`S7.18` are immutable identities stamped on every generated question. Re-ordering levels changes a level number, never a concept ID, so a failed question is looked up by concept ID with no level arithmetic or name matching.
+- **Two notations exist, and they are cross-checked.** *S-notation* (`S1.1`) is the research/concept identity; *L-notation* (`L1`–`L93`) is the level identity used by the skill map. `L(n)` is the n-th S-code in stage-then-index order, computed in code, and `npm run check:level-notation-drift` reports drift if the code and the reference crosswalk disagree.
+- **Prerequisite edges are typed, and only one type is a dependency.** Each edge is `prereq` (hard cognitive dependency), `sequence` (teaching order only — no inference in either direction), or `parallel` (co-equal, no dependency). Only `prereq` edges are reproduced in the code table; running inference over the other two produces false conclusions.
+- **How a concept's multiple prerequisites combine is not yet decided.** Nine concepts have more than one `prereq` parent (e.g. `S2.1 ← S1.1 + S1.3`, `S6.5 ← S5.4 + S5.5 + S6.1`). The research and the code both store a plain list with no AND/OR marker and neither document commits to a reading, so **no doc should assert one**. What *is* decided: a concept with no `prereq` edge has no inferred prerequisite, and the graph is validated as a DAG (known concept IDs, no cycles) at server start-up.
+
+### Build state: the 59 → 93 migration is in progress
+
+The 93-level taxonomy is registered server-side, but the worksheet renderer (`backend/fln-backend/`, a standalone Puppeteer service) still implements the retired **1–59** space and throws above 59. So level recommendations are currently **capped at 59**, and levels 60–93 are specified but not yet renderable end to end. To bridge the two, each 93-space level record carries a `legacyLevel59` pointer (null when unmapped), which is what `/api/curriculum` and `/api/question-bank` use to report content status and question-bank coverage. Proposed crosswalk: [`Research/fln_59_to_93_crosswalk.PROPOSED.md`](Research/fln_59_to_93_crosswalk.PROPOSED.md).
+
+| Concern | Source of truth |
+|---|---|
+| Level ⇄ concept registry (93 levels, stages, strands) | `backend/src/config/curriculumMap.ts` |
+| Level ⇄ skill map, L-notation (L1–L93) | `frontend/src/data/skillProgressionMap.ts` |
+| L ↔ S crosswalk (machine-checked) | `Research/fln_L_to_S_crosswalk.json`, checked by `scripts/check-level-notation-drift.ts` |
+| Prerequisite edge table | `backend/src/competencyPrerequisites.ts`, generated from `Research/fln_level_networks.md` Part 2 |
+| The research behind the count and the chains | [`Research/`](Research/) |
+| Normative requirements | [SRS.md](SRS.md) §1.8 |
+| How a level becomes an actual paper | [PIPELINES.md](PIPELINES.md) |
+
 ## How It Works (Workflow)
 
 1. Teacher generates a question paper from the dashboard (standard paper for new classes, or personalized per student once profiles exist).
@@ -74,18 +114,21 @@ The platform is built around **personalized, student-specific assessment**, not 
 
 ## Tech Stack
 
-This project is built on the **MERN stack**:
-- **M**ongoDB — database
-- **E**xpress.js — backend framework
-- **R**eact — frontend
-- **N**ode.js — backend runtime
+An **npm-workspaces monorepo** — one `npm install` at the root covers every package.
 
-(Specific libraries for OCR/scanning, PDF generation, etc. will be documented as they're added.)
+- **React + Vite** (`frontend/`) — SPA. Talks to the real backend over `/api/*`; there is no in-browser mock.
+- **Node + Express + TypeScript** (`backend/`) — the API, and the only place business logic lives. Modular domain routes per [ADR 001](docs/adr/001-backend-structure.md), signed-JWT auth, role scoping.
+- **MongoDB *or* a local JSON store** — the native `mongodb` driver is used when `MONGODB_URI` is set; otherwise `backend/data/db.json` keeps the server zero-config. Both write paths go through one store, so treat `db.json` as dev-only: it is rewritten in full per mutation and is not concurrency-safe.
+- **Puppeteer + pdf-lib** — HTML → A4 worksheet rendering, plus a standalone renderer service (`backend/fln-backend/`) that produces worksheets, answer keys and OMR coordinates.
+- **Google Gemini** (`@google/genai`) — worksheet evaluation narrative and next-level recommendation, plus LLM-assisted misconception clustering. See [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md).
+- **Python** (`ai-services/`) — currently only `scripts/pdf_rasterize.py`, for rasterizing scanned PDFs before OCR. The older LLM pipeline in that folder is retained for reference and is not invoked by the backend; see [`ai-services/PIPELINE.md`](ai-services/PIPELINE.md).
+
+More detail lives in the dedicated docs: system shape in [ARCHITECTURE.md](ARCHITECTURE.md), the four end-to-end flows in [PIPELINES.md](PIPELINES.md), and the AI/LLM surface in [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md).
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/vicharanashala/fln.git
+git clone https://github.com/lucky-pluton/fln.git
 cd fln
 npm install
 ```
@@ -246,9 +289,11 @@ at [`backend/scripts/audit-aadhaar-at-rest.ts`](backend/scripts/audit-aadhaar-at
 
 Before submitting the Onboarding Document, every new contributor must watch the FLN project explainer video (linked on Vibe) in full and pass the attention-check questions at the end. This is required *before* your first PR, not just before onboarding review — the video explains why the project is scoped the way it is (Math-only for now, no new features until Version 1 is clean, why the 93-level framework isn't a fixed lookup table) so you don't spend your first PR re-litigating decisions that are already settled.
 
+Those settled decisions are written down, so read them before you disagree with them: the [Curriculum & Level Framework](#curriculum--level-framework) section above, the research it comes from in [`Research/fln_level_networks.md`](Research/fln_level_networks.md) and [`Research/fln_framework_evolution_log.md`](Research/fln_framework_evolution_log.md), and the open questions that research explicitly leaves unanswered in `Research/fln_level_networks.md` Part 4.
+
 ### Working Only From Predefined Issues
 
-Until Version 1 is clean end-to-end, contributors should pick up work only from issues labeled [`intern-ready`](https://github.com/vicharanashala/fln/issues?q=is%3Aissue+is%3Aopen+label%3Aintern-ready) — these are mechanical, well-scoped tasks (e.g. splitting a god-file, rolling out pagination) that don't require a judgment call about platform behavior. Issues without that label may touch pedagogical logic (the level framework, certification distance, diagnostic scoring) or unbuilt backend features, and need core-team review before and during the work — don't self-assign those without checking with a maintainer first. If you think something is missing from the issue list, raise it as a new issue; don't build it unscoped.
+Until Version 1 is clean end-to-end, contributors should pick up work only from issues labeled [`intern-ready`](https://github.com/lucky-pluton/fln/issues?q=is%3Aissue+is%3Aopen+label%3Aintern-ready) — these are mechanical, well-scoped tasks (e.g. splitting a god-file, rolling out pagination) that don't require a judgment call about platform behavior. Issues without that label may touch pedagogical logic (the level framework, certification distance, diagnostic scoring) or unbuilt backend features, and need core-team review before and during the work — don't self-assign those without checking with a maintainer first. If you think something is missing from the issue list, raise it as a new issue; don't build it unscoped.
 
 
 ## Contribution Guidelines
