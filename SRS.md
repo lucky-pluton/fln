@@ -2,8 +2,8 @@
 # FLN Assessment & Personalized Worksheet Platform
 
 **Version:** v0.1
-**Subject Scope:** Mathematics FLN (Foundational Literacy & Numeracy), Classes 2–4
-**Technology Stack:** MERN (MongoDB, Express.js, React.js, Node.js) + Python (AI/Automation services)
+**Subject Scope:** Mathematics FLN (Foundational Literacy & Numeracy) — the Foundational Stage (Balvatika / Preschool 1–3, ages 3–6) through Class 4 (ages 9–10), expressed as the 93-level curriculum in §1.8. Literacy is out of scope.
+**Technology Stack:** Node.js + Express.js + TypeScript backend, React frontend, MongoDB (or a local JSON store), Google Gemini for AI, Python (PDF rasterization for the scan path) — see [ARCHITECTURE.md](ARCHITECTURE.md), [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md), [PIPELINES.md](PIPELINES.md)
 **Document Status:** Draft
 
 ---
@@ -11,6 +11,7 @@
 ## Table of Contents
 
 1. [Introduction](#1-introduction)
+   - [1.8 Curriculum & Level Framework](#18-curriculum--level-framework)
 2. [Home Page / Landing Page](#2-home-page--landing-page)
 3. [Authentication & Role Management](#3-authentication--role-management)
 4. [User Roles & Hierarchy](#4-user-roles--hierarchy)
@@ -70,7 +71,7 @@ Both deployment modes feed the same Student, Worksheet, AnswerSubmission, and Ev
 
 ### 1.4 Scope
 - Mathematics FLN only (no Literacy).
-- Curriculum stored as Markdown files per level, authored by the core team (not editable via UI). AI/core-team pedagogical decisions take first priority; all role feedback is raised via an in-app ticketing system (general tickets by any role, curriculum tickets by Teachers) and incorporated only after review by the Superadmin team.
+- Curriculum stored as Markdown files per level, authored by the core team (not editable via UI), and registered server-side as the level ⇄ concept mapping in §1.8. AI/core-team pedagogical decisions take first priority; all role feedback is raised via an in-app ticketing system (general tickets by any role, curriculum tickets by Teachers) and incorporated only after review by the Superadmin team.
 - All Assessment for all students (both newly enrolled and existing).
 - Fixed national assessment calendar: three test cycles per academic year — Baseline (start of year), Mid-year, End-of-year. Baseline covers the complete syllabus of the previous class. Mid-Year covers the previous class syllabus plus topics completed in the current class until the mid-year point. End-Year covers the previous class syllabus plus the complete current class syllabus. The student's FLN level is updated by AI after every assessment. Levels are milestones the child is progressed toward with worksheets, not individual test gates the child must clear one at a time.
 - Single AI-personalized worksheet-production flow. Generation/print rights are shared across Teacher, School, Volunteer, and Block Admin, governed by two independent pairwise generation locks — {Teacher ↔ School} and {Volunteer ↔ Block Admin} — first to generate locks the paired role out for that class/session; auto-releases when the exam cycle closes.
@@ -79,7 +80,7 @@ Both deployment modes feed the same Student, Worksheet, AnswerSubmission, and Ev
 - Pre-built SVG asset library for AI-personalized worksheets; category-based substitution on missing assets; the image/visual style of questions is refreshed by the core team on a yearly cadence.
 - HTML → A4 PDF rendering for worksheets.
 - Answer ingestion via ICR (Intelligent Character Recognition): structured JSON per student (e.g., `{"Q1":"A"}`) from dedicated scanner hardware. Bulk scanning handles ~40–50 sheets in 2–3 minutes. Student details are printed directly on each question paper.
-- Python evaluation engine: classification, comparison, scoring, AI narrative report, next-level recommendation. Evaluation processing for a school begins 8 hours after all of that day's classes have closed their submission windows.
+- Evaluation engine: classification, comparison, scoring, AI narrative report, next-level recommendation. Implemented in the TypeScript backend (`backend/src/routes/evaluation.ts`), using Gemini for the narrative and next-level recommendation with a deterministic non-AI fallback for each. The Python pipeline under `ai-services/` is retained for reference and is not invoked by the backend. Evaluation processing for a school begins 8 hours after all of that day's classes have closed their submission windows.
 - Continuous level/question revision: if 50%+ of students consistently fail a question tagged "easy," the system auto-flags that question for core-team review; role-submitted feedback (via the in-app ticketing system) also feeds into level/curriculum revision, subject to Superadmin-team review before any change is applied.
 - Full national role hierarchy (Superadmin → Admin → District Admin → Block Admin → School (Principal) → Teacher/Volunteer) with access-control matrix, school/district/state analytics, and audit logbook.
 - Mandatory Aadhar/Birth Certificate number as a unique student identifier, masked for all roles except Superadmin.
@@ -104,8 +105,12 @@ Developers (MERN + Python), project mentors, curriculum designers, AI engineers,
 | Assessment Cycle | One of three assessment events in the academic year (Baseline, Mid-Year, End-Year), each followed by AI evaluation and FLN level update |
 | FLN Level Update | The student's FLN level is reassigned/updated by AI after every assessment based on performance; used for personalized worksheet generation until the next assessment |
 | Worksheet JSON | Structured, validated output of AI worksheet generation |
-| Evaluation Engine | Python subsystem scoring a completed assessment and recommending next level |
-| Competency | A single, atomic FLN skill/concept that a question maps to |
+| Evaluation Engine | Server-side subsystem (`backend/src/routes/evaluation.ts`) that ingests a completed assessment, scores it, produces the AI narrative report, and recommends the next level. See §9 and [PIPELINES.md](PIPELINES.md) |
+| Competency | A single, atomic FLN skill that a question maps to. In the curriculum a competency carries an immutable Concept ID `Sx.y` (`S1.1`–`S7.18`); one concept maps to exactly one level, and a failed question is looked up by that ID rather than by level number |
+| FLN Level | One of the 93 positions in the curriculum taxonomy defined in §1.8. A level is a presentation layer over exactly one competency |
+| Balvatika Band | The single reported band covering Preschool 1–3 (stages 1–3, levels 1–27, ages 3–6), built backward from the age 5–6 Balvatika exit competency. See §1.8.2 |
+| Prerequisite Edge | A typed relationship between two competencies. Only `prereq` is a hard cognitive dependency and is load-bearing for inference; `sequence` records teaching order only and `parallel` records co-equal nodes, and neither may be used to infer mastery. See §1.8.3 |
+| S-notation / L-notation | The two names for the same 93 levels. S-notation (`S1.1`) is the immutable competency identity; L-notation (`L1`–`L93`) is the level identity used by the skill map, computed as the n-th S-code in stage-then-index order and cross-checked against a reference crosswalk. See §1.8.1 |
 | District Admin | District-level coordination role; oversees Block Admins within the district |
 | Block Admin | Block-level coordination role, sitting between District Admin and School; can generate/print papers and oversees Volunteers |
 | Generation Lock | Per-class, per-exam-session lock. Two independent pairs — {Teacher ↔ School} and {Volunteer ↔ Block Admin} — where the first role in the pair to generate/print locks the other out of generating for that same class/session; auto-releases when the exam cycle closes |
@@ -116,6 +121,56 @@ Developers (MERN + Python), project mentors, curriculum designers, AI engineers,
 | Level Flag | Auto-generated review flag on a curriculum question when 50%+ of attempting students consistently fail it despite an "easy" difficulty tag |
 ---
 
+
+
+### 1.8 Curriculum & Level Framework
+
+This section records the curriculum framework the rest of this document operates on: a 93-level, Balvatika-first taxonomy with a typed prerequisite DAG. It is **descriptive of the current framework** and points at the research and code that define it, rather than restating pedagogical reasoning. Where a decision is still open, that is stated as open.
+
+**Source of truth.** The level/concept registry is `backend/src/config/curriculumMap.ts`. The research it derives from is [`Research/fln_level_networks.md`](Research/fln_level_networks.md) (level count in Part 1, prerequisite graph in Part 2, open questions in Part 4) with the derivation history in [`Research/fln_framework_evolution_log.md`](Research/fln_framework_evolution_log.md).
+
+#### 1.8.1 Stage structure and level count
+
+| Stage | Band | Ages | Levels | Concept IDs | Testable | Oral-only |
+|---|---|---|---|---|---|---|
+| 1 | Preschool 1 | 3–4 | 1–7 | S1.1–S1.7 | 7 | 0 |
+| 2 | Preschool 2 | 4–5 | 8–17 | S2.1–S2.10 | 10 | 0 |
+| 3 | Preschool 3 / **Balvatika** | 5–6 | 18–27 | S3.1–S3.10 | 10 | 0 |
+| 4 | Class 1 | 6–7 | 28–42 | S4.1–S4.15 | 15 | 1 (poems) |
+| 5 | Class 2 | 7–8 | 43–61 | S5.1–S5.19 | 19 | 1 (riddles) |
+| 6 | Class 3 (★ MPL) | 8–9 | 62–75 | S6.1–S6.14 | 14 | 0 |
+| 7 | Class 4 | 9–10 | 76–93 | S7.1–S7.18 | 18 | 0 |
+| | **Total** | | **1–93** | **S1.1–S7.18** | **93** | **2** |
+
+- **One competency = one level = one node.** Every level maps to exactly one Concept ID and every Concept ID maps to exactly one level. Each generated question records its Concept ID, so resolving a failure is a direct lookup — there is no level-number arithmetic, name matching, or translation step.
+- **Concept IDs are immutable; level numbers are not.** A Concept ID is never renumbered or reused. Re-ordering the curriculum changes only the level-number assignment in the registry. Difficulty is expressed as within-node sub-levels (`.0` / `.1` / `.2`), not as extra nodes.
+- **The count is not fixed.** 93 is a count derived from decomposing the research into ten strand-chains, not a target — the framework grew 85 → 93 during review, the last round on 2026-07-19. Implementations must read the count from the registry rather than hardcoding it.
+- **Two notations, one crosswalk.** S-notation (`S1.1`) is the competency identity; L-notation (`L1`–`L93`) is the level identity used by the skill map, defined as the n-th S-code in stage-then-index order and computed in code rather than hand-maintained. `npm run check:level-notation-drift` fails if the computed mapping and the reference crosswalk (`Research/fln_L_to_S_crosswalk.json`) disagree.
+
+#### 1.8.2 Balvatika-first build order
+
+- The framework is **built backward from the Balvatika (age 5–6) exit competency**, the preschool stage with a directly specified target. The resulting count was then checked against the specified per-year progression.
+- **The build order is Balvatika → Class 1 → Class 2 → Class 3 → Class 4.** Levels 1–27 are the Balvatika band and are the first build target; each later stage extends the graph forward.
+- **Stages 1–3 are one reported Balvatika band (levels 1–27), not three.** The national Lakshya specifies a single Balvatika target rather than three, and pre-primary years are not implemented uniformly across states. Prerequisite edges still order a child precisely *within* the band; only the per-year label is dropped, so dashboards and reports must present the band as one unit.
+- **The mapping is grade-anchored, not age-anchored.** FLN is a grade-level competency and age is an annotation. The framework keeps *grade-level competency* (the benchmark for the enrolled grade) distinct from *true level* (what the diagnostic actually finds), because certification compares the two. Grade→level mapping is expected to be configurable per state, since states localise their Lakshya targets.
+
+#### 1.8.3 Prerequisites and the DAG
+
+- **Every edge is typed, and the typing is load-bearing.** `prereq` is a hard cognitive dependency and is the only type that inference may cross. `sequence` records that the source material happens to teach the two in that order and carries no inference in either direction. `parallel` marks co-equal nodes with no dependency. Conflating them produces false conclusions — for example inferring that a child who estimates capacity well has probably mastered length estimation, when those are independent co-equal targets.
+- **Only `prereq` edges are implemented.** `backend/src/competencyPrerequisites.ts` reproduces the `prereq` edges from `Research/fln_level_networks.md` Part 2 and deliberately omits the `sequence` and `parallel` edges. The table is generated from the research document rather than hand-typed, and is keyed by Concept ID.
+- **The graph is a DAG and is validated as one.** Validation checks that both endpoints of every edge are known Concept IDs and that the graph is acyclic. An invalid table is a start-up-class defect, not a runtime fallback. Nothing outside that module may hold a second copy of the graph, and no AI path may infer an edge the graph does not contain.
+- **Absence means absence.** A concept with no `prereq` edge has no inferred prerequisite; a system must return an empty prerequisite set rather than falling back to level order, the previous level, or the strand.
+- **Open — how a concept's multiple prerequisites combine.** Nine concepts have more than one `prereq` parent, e.g. `S2.1 ← S1.1 + S1.3`, `S5.4 ← S4.6 + S5.2`, and `S6.5 ← S5.4 + S5.5 + S6.1`. Whether such a set is conjunctive (all required) or disjunctive (any one suffices) is **not decided**: the research states the surmise test for a single edge, and both the research and the code store a plain list with no AND/OR marker. This SRS therefore specifies neither, and any implementation must treat the combination rule as an open decision for the core team rather than assuming one.
+- **Open — reconciliation is incomplete.** The research records that the code carried an independent typing of these edges which disagreed with it, and resolved the disagreement in favour of the softer typing where no rationale was recorded: 14 edges are annotated in Part 2 as demoted on 2026-08-21 for exactly that reason. A small number of edges remain unresolved in both directions, and the sub-skill layer beneath the levels carries no edges yet. Treat the graph as settled in shape but not closed in detail.
+
+#### 1.8.4 Build state — the 59 → 93 migration (in progress)
+
+The 93-level taxonomy is registered server-side, but the worksheet renderer has not caught up. Stating the gap so that no document or UI implies otherwise:
+
+- The renderer (`backend/fln-backend/`, a standalone Express + Puppeteer service driven over HTTP by `backend/src/levelsBackendClient.ts`) implements the **retired 1–59 level space** and throws `UnknownLevelError` above 59.
+- Consequently **placement and promotion cap a recommended level at 59**, not 93. Levels 60–93 are specified and registered but are not yet renderable end to end.
+- The 93-space level records carry a `legacyLevel59` pointer (null when unmapped), which is how 59-space content is addressed from the 93-space registry during the migration window. Both spaces are bridged by explicit mapping helpers, never by silent level-number arithmetic.
+- The proposed crosswalk is [`Research/fln_59_to_93_crosswalk.PROPOSED.md`](Research/fln_59_to_93_crosswalk.PROPOSED.md). Until the migration completes, "93 levels" describes the **taxonomy** while the **buildable** range is 1–59.
 
 
 ## 2. Home Page / Landing Page
@@ -697,9 +752,9 @@ Runs independently of worksheet generation; triggered only after answers are ing
 
 ---
 
-## 12. Exam JSON Schema
+## 12. Worksheet / Question Paper JSON Schema
 
-### 12.1 Exam JSON
+### 12.1 Worksheet / Question Paper JSON
 ```json
 {
   "exam_id": "String",
@@ -714,7 +769,8 @@ Runs independently of worksheet generation; triggered only after answers are ing
       "topic": "Number Sense | Number Operations | Money | Measurement | Shapes | Fractions | Patterns | Data Handling | Calendar and Time",
       "subtopic": "string",
       "difficulty": "easy | medium | hard",
-      "source_level": "Preschool 1 | Preschool 2 | Preschool 3 | Class 1 | Class 2 | Class 3",
+      "source_level": "Preschool 1 | Preschool 2 | Preschool 3 | Class 1 | Class 2 | Class 3 | Class 4",
+      "concept_id": "S1.1 | S1.2 | ... | S7.18",
       "class_level": 1,
       "reasoning": "string"
     }
