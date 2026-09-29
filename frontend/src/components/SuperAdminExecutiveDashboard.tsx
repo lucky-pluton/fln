@@ -1034,7 +1034,20 @@ export const SuperAdminExecutiveDashboard: React.FC<SuperAdminDashboardProps> = 
                             {school.completionRate}%
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-amber-600 font-bold">
-                            ★ {school.studentSatisfaction}
+                            {/* FLN records no student satisfaction signal, so
+                                the API sends null for it. Render that as an
+                                em dash rather than a 0-star score, which would
+                                read as "every child is unhappy". */}
+                            {school.studentSatisfaction == null ? (
+                              <span
+                                className="text-slate-400 dark:text-slate-500"
+                                title="Not tracked yet — FLN collects no student satisfaction data"
+                              >
+                                —
+                              </span>
+                            ) : (
+                              <>★ {school.studentSatisfaction}</>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">
                             {school.interviewSuccessRate}%

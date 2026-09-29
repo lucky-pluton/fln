@@ -297,6 +297,13 @@ const LegacyRegionalAnalyticsView: React.FC<{ token: string; user: User }> = ({ 
   );
 };
 
+// Issue #515. The superadmin Analytics tab is served by
+// SuperAdminExecutiveDashboard, which reads /api/analytics/superadmin and
+// defaults its state filter to 'ALL'. It therefore never reaches the
+// /api/analytics rollup below, and never inherits that view's hardcoded
+// Punjab/Ludhiana scope defaults. LegacyRegionalAnalyticsView stays for
+// Admin / District Admin / Block Admin, who are scoped to their own region
+// and must keep calling /api/analytics.
 export const RegionalAnalyticsView: React.FC<{ token: string; user: User }> = ({ token, user }) => {
   if (user.role === UserRole.SUPERADMIN) {
     return <SuperAdminExecutiveDashboard user={user} token={token} />;
