@@ -8,20 +8,21 @@ import { apiFetch } from '../../services/apiClient';
 import { User, UserRole } from '../../types';
 import { SuperAdminExecutiveDashboard } from '../SuperAdminExecutiveDashboard';
 
-const LegacyRegionalAnalyticsView: React.FC<{ token: string; user: User }> = ({ token, user }) => {
+const RegionalAnalyticsViewContent: React.FC<{ token: string; user: User }> = ({ token, user }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Scopes
-  const [stateCode, setStateCode] = useState(user.stateCode || 'PB');
-  const [districtCode, setDistrictCode] = useState(user.districtCode || 'LDH');
-  const [blockCode, setBlockCode] = useState(user.blockCode || 'LDH-01');
+  // Scopes — default to user's assigned scope or empty string for all-India view
+  const [stateCode, setStateCode] = useState(user.stateCode || '');
+  const [districtCode, setDistrictCode] = useState(user.districtCode || '');
+  const [blockCode, setBlockCode] = useState(user.blockCode || '');
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
       const q = `stateCode=${stateCode}&districtCode=${districtCode}&blockCode=${blockCode}`;
-      const res = await apiFetch(`/api/analytics?${q}`, {
+      const endpoint = user.role === UserRole.SUPERADMIN ? `/api/analytics/superadmin?${q}` : `/api/analytics?${q}`;
+      const res = await apiFetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const d = await res.json();
@@ -299,15 +300,13 @@ const LegacyRegionalAnalyticsView: React.FC<{ token: string; user: User }> = ({ 
 
 // Issue #515. The superadmin Analytics tab is served by
 // SuperAdminExecutiveDashboard, which reads /api/analytics/superadmin and
-// defaults its state filter to 'ALL'. It therefore never reaches the
-// /api/analytics rollup below, and never inherits that view's hardcoded
-// Punjab/Ludhiana scope defaults. LegacyRegionalAnalyticsView stays for
+// defaults its state filter to 'ALL'. RegionalAnalyticsViewContent stays for
 // Admin / District Admin / Block Admin, who are scoped to their own region
-// and must keep calling /api/analytics.
+// and call /api/analytics without hardcoded regional defaults.
 export const RegionalAnalyticsView: React.FC<{ token: string; user: User }> = ({ token, user }) => {
   if (user.role === UserRole.SUPERADMIN) {
     return <SuperAdminExecutiveDashboard user={user} token={token} />;
   }
 
-  return <LegacyRegionalAnalyticsView token={token} user={user} />;
+  return <RegionalAnalyticsViewContent token={token} user={user} />;
 };

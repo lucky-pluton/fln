@@ -8,9 +8,9 @@ export function registerAnalyticsRoutes(app: express.Express) {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     // Query params for dynamic filtering
-    const stateCodeParam = (req.query.stateCode as string) || user.stateCode || 'PB';
-    const districtCodeParam = (req.query.districtCode as string) || user.districtCode || 'LDH';
-    const blockCodeParam = (req.query.blockCode as string) || user.blockCode || 'LDH-01';
+    const stateCodeParam = (req.query.stateCode as string) || user.stateCode || '';
+    const districtCodeParam = (req.query.districtCode as string) || user.districtCode || '';
+    const blockCodeParam = (req.query.blockCode as string) || user.blockCode || '';
 
     // Calculate dynamic scopes using fast aggregation pipelines
     const [
