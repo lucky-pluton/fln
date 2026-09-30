@@ -11,11 +11,13 @@
  *
  *  2. #523's proposed S5.8 OR case. The override map is populated, but both of
  *     its groups are `status: 'PROPOSED'` pending Pavani's sign-off, and only
- *     VALIDATED groups gate. So S5.8 must still behave exactly like the flat
- *     AND list it had before the override existed, and the OR must switch on the
- *     moment a group's status flips. The activation path is exercised by
- *     injecting a VALIDATED copy of the override rather than mutating the
- *     module's const.
+ *     VALIDATED hard groups gate. So S5.8 must still behave exactly like the
+ *     flat AND list it had before the override existed, and the OR must switch
+ *     on the moment a group's status flips. The activation path is exercised
+ *     two ways: by injecting a VALIDATED copy of the override into
+ *     `effectiveHardPrerequisiteGroups()`, and end-to-end by temporarily
+ *     installing that approved copy in the module's override map (restored in a
+ *     `finally`) so `isPrerequisiteSatisfied()` itself is what gets pinned.
  *
  * Pure functions only - no DB, no network.
  */
@@ -54,6 +56,23 @@ const s58Override = CONCEPT_PREREQUISITE_GROUP_OVERRIDES['S5.8'];
 
 /** The same override with the sign-off the policy requires applied. */
 const approvedS58: PrerequisiteGroup[] = (s58Override ?? []).map(g => ({ ...g, status: 'VALIDATED' as const }));
+
+/**
+ * Temporarily install `groups` as conceptId's override in the real map, run
+ * `fn`, then restore whatever was there — so `isPrerequisiteSatisfied()` can be
+ * pinned end-to-end (it reads the module's own map) without the swap leaking
+ * into any other test.
+ */
+function withOverride(conceptId: string, groups: readonly PrerequisiteGroup[], fn: () => void): void {
+  const map = CONCEPT_PREREQUISITE_GROUP_OVERRIDES as Record<string, readonly PrerequisiteGroup[]>;
+  const original = map[conceptId];
+  map[conceptId] = groups;
+  try {
+    fn();
+  } finally {
+    map[conceptId] = original;
+  }
+}
 
 console.log('graph invariants (index.ts refuses to boot without these)');
 
@@ -157,6 +176,18 @@ test('a DEPRECATED group does not gate either', () => {
   );
 });
 
+test('approving a group that does not gate leaves the hard gate exactly as it was', () => {
+  // Policy point 7: only HARD_PREREQUISITE groups gate. An override whose only
+  // VALIDATED group is merely RECOMMENDED is approved on the non-hard axis —
+  // that must not un-gate the concept, and must not activate a pending route.
+  const recommendedOnly: PrerequisiteGroup[] = [
+    { groupId: 'g1', type: 'AND', memberIds: ['S5.19'], relationshipType: 'RECOMMENDED', status: 'VALIDATED' },
+  ];
+  const groups = effectiveHardPrerequisiteGroups('S5.8', { 'S5.8': recommendedOnly });
+  assert.deepStrictEqual(groups.map(g => g.memberIds), [directPrerequisites('S5.8')]);
+  assert.strictEqual(groups.length > 0, true, 'the hard gate must not disappear');
+});
+
 console.log('\n#523: flipping status to VALIDATED activates the OR');
 
 test('once approved, skip-counting alone satisfies S5.8', () => {
@@ -178,6 +209,34 @@ test('an approved multi-member route still requires ALL of its members (AND with
       .some(g => g.memberIds.every(id => m.has(id)));
   assert.strictEqual(gate(mastered('S5.6')), false);
   assert.strictEqual(gate(mastered('S5.6', 'S5.19')), true);
+});
+
+test('end to end: isPrerequisiteSatisfied() puts the approved OR into force', () => {
+  // The helper-level tests above re-state the satisfaction predicate; this one
+  // pins the public gating API itself against a temporarily approved map, so a
+  // future edit cannot e.g. point isPrerequisiteSatisfied() back at
+  // prerequisiteGroups() (which reports PROPOSED groups) unnoticed.
+  withOverride('S5.8', approvedS58, () => {
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.19')), true);
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.6')), true);
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.6', 'S5.19')), true);
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered()), false);
+    // Concepts with no override are untouched by the swap.
+    assert.strictEqual(isPrerequisiteSatisfied('S5.4', mastered('S4.6')), false);
+    assert.strictEqual(isPrerequisiteSatisfied('S5.4', mastered('S4.6', 'S5.2')), true);
+  });
+  // Swap restored: the real, still-PROPOSED map gates exactly as before.
+  assert.deepStrictEqual(CONCEPT_PREREQUISITE_GROUP_OVERRIDES['S5.8'], s58Override);
+  assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.19')), false);
+});
+
+test('approval is per group: one validated route is in force, the flat AND does not come back', () => {
+  const route1Only: readonly PrerequisiteGroup[] = [approvedS58[0]]; // g1: the S5.19 skip-counting route
+  withOverride('S5.8', route1Only, () => {
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.19')), true);  // approved route counts alone
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered('S5.6')), false); // sibling route still PROPOSED
+    assert.strictEqual(isPrerequisiteSatisfied('S5.8', mastered()), false);
+  });
 });
 
 console.log('\nthe proposal stays visible for review even while it gates nothing');

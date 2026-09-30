@@ -56,8 +56,9 @@ import { getLevelForConcept } from './config/curriculumMap';
  * questions: `prerequisiteGroups()` says what has been *proposed* (a pending OR
  * is visible there, for review and teaching-plan views), while
  * `effectiveHardPrerequisiteGroups()` says what is *in force* (only VALIDATED
- * groups count, so a not-yet-approved override gates nobody). #523's proposed
- * S5.8 OR therefore changes nothing until it is approved and its status flips.
+ * *hard* groups count, so a not-yet-approved override gates nobody). #523's
+ * proposed S5.8 OR therefore changes nothing until it is approved and its
+ * status flips.
  *
  * FLN prerequisite-graph policy (agreed 2026-09-19, to be confirmed with
  * Pavani before the first real OR case ships):
@@ -139,10 +140,11 @@ export interface PrerequisiteGraphChange {
  *
  * That entry is deliberately NOT a live gate yet. `prerequisiteGroups()` below
  * reports what has been *proposed*; `effectiveHardPrerequisiteGroups()` reports
- * what is *in force*, and only VALIDATED groups gate. So while #523's groups
- * stay `status: 'PROPOSED'`, S5.8 keeps exactly the flat-AND behaviour it had
- * before this entry existed, and flipping one word to 'VALIDATED' after
- * sign-off is the single switch that activates the OR.
+ * what is *in force*, and only VALIDATED hard groups gate. So while #523's
+ * groups stay `status: 'PROPOSED'`, S5.8 keeps exactly the flat-AND behaviour
+ * it had before this entry existed, and flipping each group's status word to
+ * 'VALIDATED' after sign-off is the switch that puts that route into force
+ * (both groups for the full OR).
  *
  * Per policy point 5/6, do not populate this from a guess made while wiring up
  * code: OR requires curriculum-lead approval and either NCF-FS/NIPUN textual
@@ -243,11 +245,18 @@ export function prerequisiteGroups(conceptId: string): readonly PrerequisiteGrou
  * Only VALIDATED hard-prerequisite groups count. An override still awaiting
  * sign-off — e.g. #523's proposed S5.8 OR — therefore cannot quietly change
  * which students are gated (policy point 5: OR requires curriculum-lead
- * approval; point 6: expert judgment proposes, a human approves). While no group
- * in an override is VALIDATED, the concept falls back to the same implicit AND
- * group it would have had anyway, so adding a PROPOSED override is a no-op for
- * behaviour. Flipping a group's `status` to 'VALIDATED' is the one-word switch
- * that puts it into force.
+ * approval; point 6: expert judgment proposes, a human approves). Until some
+ * *hard* group in the override is VALIDATED, the concept falls back to the same
+ * implicit AND group it would have had anyway, so adding a PROPOSED override is
+ * a no-op for behaviour, and so is approving a group that does not gate at all
+ * (policy point 7: only hard prerequisites gate — an approved RECOMMENDED or
+ * SEQUENCE group must not silently un-gate what the flat table still claims).
+ *
+ * Approval is per group, and the flat fallback is not re-applied once the
+ * override is in force: with any hard group VALIDATED, only that override's
+ * VALIDATED hard groups gate (a route approved in isolation counts on its own;
+ * a still-PROPOSED sibling route does not). Flipping a group's `status` to
+ * 'VALIDATED' is the one-word switch that puts that route into force.
  *
  * `overrides` is injectable purely so the activation path can be exercised
  * without mutating this module's const; callers should omit it.
