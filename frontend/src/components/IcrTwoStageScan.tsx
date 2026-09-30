@@ -27,7 +27,10 @@ interface ExtractedAnswer {
 interface ScanResponse {
   success: boolean;
   answers?: Record<string, ExtractedAnswer>;
-  extractedQuestions: string[];
+  // Optional: the transcribing backend doesn't always return question text.
+  // Consumers must treat an absent value as "no text to compare", not as
+  // "every row mismatched".
+  extractedQuestions?: string[];
   ocrAnalysis?: {
     rawOcrText: string;
     extractedTokens: Array<{ text: string; confidence: number; bbox?: number[][] }>;
@@ -290,7 +293,7 @@ export const IcrTwoStageScan: React.FC<IcrTwoStageScanProps> = ({
         answers,
         extractedQuestions: Array.isArray(data.extractedQuestions)
           ? data.extractedQuestions.map((question: unknown) => String(question ?? ''))
-          : [],
+          : undefined,
         ocrAnalysis: {
           rawOcrText: data.rawOcrText || '',
           extractedTokens: (data.extractedTokens || []).map((t: any) => ({

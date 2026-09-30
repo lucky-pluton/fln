@@ -4,7 +4,7 @@ import { Student, ClassGroup, EvaluationReport, User } from '../types';
 import { ChildErrorSignature } from './MisconceptionFingerprint';
 import { IcrTwoStageScan } from './IcrTwoStageScan';
 import { BulkIcrScan, BulkChunkResult, BulkOcrResponse } from './BulkIcrScan';
-import { questionsLikelyMatch } from '../utils/ocrQuestionMatching';
+import { alignExtractedQuestions, questionsLikelyMatch } from '../utils/ocrQuestionMatching';
 
 interface IcrScannerProps {
   token: string;
@@ -314,7 +314,10 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
 
   const [extractedAnswers, setExtractedAnswers] = useState<{ [questionId: string]: string }>({});
   const [originalOcrAnswers, setOriginalOcrAnswers] = useState<{ [questionId: string]: string }>({});
-  const [extractedQuestions, setExtractedQuestions] = useState<string[]>([]);
+  // OCR-transcribed question text, keyed by the answer-key question id it was
+  // scanned for. Keyed rather than positional so a reordered/re-sorted question
+  // list can never compare row N against the wrong transcription.
+  const [extractedQuestions, setExtractedQuestions] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<Array<{ id: string; question: string; correctAnswer: string; topic?: string }>>([]);
   const [report, setReport] = useState<EvaluationReport | null>(null);
   // Toggle for the "show full report card" panel below the placement
@@ -637,7 +640,7 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
       setQuestions(loadedQuestions);
       setExtractedAnswers(loadedAnswers);
       setOriginalOcrAnswers({});
-      setExtractedQuestions([]);
+      setExtractedQuestions({});
       answerInputRefs.current = [];
       setOcrPreviewData({
         rawOcrText: '[MANUAL ENTRY — no OCR pass performed]',
@@ -807,7 +810,7 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
     setOcrPreviewData(firstRes.ocrAnalysis);
     setExtractedAnswers(extracted);
     setOriginalOcrAnswers(extracted);
-    setExtractedQuestions(Array.isArray(data.extractedQuestions) ? data.extractedQuestions : []);
+    setExtractedQuestions(alignExtractedQuestions(loadedQuestions, data.extractedQuestions));
     setQuestions(loadedQuestions);
     setReport({
       id: 'rep_' + Date.now(),
@@ -847,6 +850,10 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
   // in the teacher's batch.
   const handleBulkOcrSuccess = (resp: BulkOcrResponse) => {
     setBulkChunkResults(resp.results || []);
+    // Bulk chunks carry no transcribed question text, so drop any left over
+    // from a previous single-sheet scan — otherwise the verify table would
+    // flag every bulk row against a stale scan's question text.
+    setExtractedQuestions({});
     setBulkMeta({
       totalPages: resp.totalPages,
       totalStudents: resp.totalStudents,
@@ -1189,7 +1196,7 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
 
   const resetScanner = () => {
     setExtractedAnswers({});
-    setExtractedQuestions([]);
+    setExtractedQuestions({});
     setReport(null);
     setBulkResults(null);
     setUploadedFile(null);
@@ -1711,7 +1718,7 @@ export const IcrScanner: React.FC<IcrScannerProps> = ({ token, user, onBack }) =
                       if (!q) return null;
                       const userVal = extractedAnswers[q.id] || '';
                       const origVal = originalOcrAnswers[q.id] || '';
-                      const extractedQuestion = extractedQuestions[idx] ?? '';
+                      const extractedQuestion = extractedQuestions[q.id] ?? '';
                       const questionMismatch = extractedQuestion.trim().length > 0
                         && !questionsLikelyMatch(extractedQuestion, q.question);
                       const isTeacherEdited = userVal !== origVal;

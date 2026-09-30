@@ -2,6 +2,10 @@ import { normalizeQuestionText } from './questionBankAudit';
 
 const QUESTION_MATCH_THRESHOLD = 0.65;
 const MIN_CONTAINMENT_LENGTH = 12;
+const NUMERIC_WEIGHT = 0.4;
+
+const NUMBER_PATTERN = /\d+(?:\.\d+)?/g;
+const MATH_OPERATOR_PATTERN = /[<>=+×÷/%]/g;
 
 function normalizeForComparison(text: string): string {
   return normalizeQuestionText(text.normalize('NFKC'))
@@ -13,6 +17,14 @@ function normalizeForComparison(text: string): string {
     .trim();
 }
 
+function numbersIn(text: string): string[] {
+  return text.match(NUMBER_PATTERN) || [];
+}
+
+function operatorSignature(text: string): string {
+  return (text.match(MATH_OPERATOR_PATTERN) || []).join('|');
+}
+
 function tokenSimilarity(left: string, right: string): number {
   const leftTokens = new Set(left.split(' '));
   const rightTokens = new Set(right.split(' '));
@@ -21,10 +33,7 @@ function tokenSimilarity(left: string, right: string): number {
   return union === 0 ? 1 : intersection / union;
 }
 
-function levenshteinSimilarity(left: string, right: string): number {
-  if (left === right) return 1;
-  if (left.length === 0 || right.length === 0) return 0;
-
+function editDistance<T>(left: T[], right: T[]): number {
   let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
     const current = [leftIndex];
@@ -38,12 +47,18 @@ function levenshteinSimilarity(left: string, right: string): number {
     }
     previous = current;
   }
-
-  return 1 - previous[right.length] / Math.max(left.length, right.length);
+  return previous[right.length];
 }
 
-function signature(text: string, pattern: RegExp): string {
-  return (text.match(pattern) || []).join('|');
+function levenshteinSimilarity(left: string, right: string): number {
+  if (left === right) return 1;
+  if (left.length === 0 || right.length === 0) return 0;
+  return 1 - editDistance(left.split(''), right.split('')) / Math.max(left.length, right.length);
+}
+
+function numericSimilarity(extracted: string[], known: string[]): number {
+  if (extracted.length === 0 && known.length === 0) return 1;
+  return 1 - editDistance(extracted, known) / Math.max(extracted.length, known.length);
 }
 
 export function questionsLikelyMatch(extracted: string, known: string): boolean {
@@ -52,23 +67,43 @@ export function questionsLikelyMatch(extracted: string, known: string): boolean 
 
   if (normalizedExtracted.length === 0 || normalizedKnown.length === 0) return true;
   if (normalizedExtracted === normalizedKnown) return true;
-
-  const extractedNumbers = signature(normalizedExtracted, /\d+(?:\.\d+)?/g);
-  const knownNumbers = signature(normalizedKnown, /\d+(?:\.\d+)?/g);
-  if (extractedNumbers !== knownNumbers) return false;
-
-  const extractedMath = signature(normalizedExtracted, /[<>=+×÷/%]/g);
-  const knownMath = signature(normalizedKnown, /[<>=+×÷/%]/g);
-  if (extractedMath !== knownMath) return false;
+  if (operatorSignature(normalizedExtracted) !== operatorSignature(normalizedKnown)) return false;
 
   const shorter = normalizedExtracted.length <= normalizedKnown.length
     ? normalizedExtracted
     : normalizedKnown;
   const longer = shorter === normalizedExtracted ? normalizedKnown : normalizedExtracted;
-  if (shorter.length >= MIN_CONTAINMENT_LENGTH && longer.includes(shorter)) return true;
+  const textSimilarity = shorter.length >= MIN_CONTAINMENT_LENGTH && longer.includes(shorter)
+    ? 1
+    : Math.max(
+      tokenSimilarity(normalizedExtracted, normalizedKnown),
+      levenshteinSimilarity(normalizedExtracted, normalizedKnown)
+    );
 
-  return Math.max(
-    tokenSimilarity(normalizedExtracted, normalizedKnown),
-    levenshteinSimilarity(normalizedExtracted, normalizedKnown)
-  ) >= QUESTION_MATCH_THRESHOLD;
+  const numericFactor = (1 - NUMERIC_WEIGHT)
+    + NUMERIC_WEIGHT * numericSimilarity(numbersIn(normalizedExtracted), numbersIn(normalizedKnown));
+
+  return textSimilarity * numericFactor >= QUESTION_MATCH_THRESHOLD;
+}
+
+/**
+ * Key each OCR-transcribed question by the id of the authoritative question it
+ * was paired with, so the verify table can never re-align them by whatever
+ * order the question array happens to be in. Both input arrays come from the
+ * same scan and are paired positionally once, here; every later lookup is by id.
+ * A missing `extractedQuestions` (older backend) yields an empty map, which
+ * means "nothing to flag" rather than "everything mismatched".
+ */
+export function alignExtractedQuestions<T extends { id: string }>(
+  questions: ReadonlyArray<T>,
+  extractedQuestions?: ReadonlyArray<string> | null
+): Record<string, string> {
+  const aligned: Record<string, string> = {};
+  const transcribed = extractedQuestions ?? [];
+  questions.forEach((question, index) => {
+    const id = question?.id;
+    if (!id) return;
+    aligned[id] = String(transcribed[index] ?? '');
+  });
+  return aligned;
 }
