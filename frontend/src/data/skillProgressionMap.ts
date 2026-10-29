@@ -206,7 +206,7 @@ export const CORE_SKILLS: CoreSkill[] = [
       { id: 'SK13.03', name: 'Single-digit addition', observable: true, prerequisites: [{ subskillId: 'SK13.02', prerequisiteType: 'entailment', rationale: 'Concrete addition leads to single-digit mental/written sums' }] },
       { id: 'SK13.04', name: 'Addition within 20', observable: true, prerequisites: [{ subskillId: 'SK13.03', prerequisiteType: 'entailment' }] },
       { id: 'SK13.05', name: 'Addition within 30', observable: true, prerequisites: [{ subskillId: 'SK13.04', prerequisiteType: 'entailment' }] },
-      { id: 'SK13.06', name: 'Two-digit addition', observable: true, prerequisites: [{ subskillId: 'SK13.05', prerequisiteType: 'entailment' }] },
+      { id: 'SK13.06', name: 'Two-digit addition', observable: true, prerequisites: [{ subskillId: 'SK13.05', prerequisiteType: 'entailment', rationale: 'One of two routes, see #483' }] },
       { id: 'SK13.07', name: 'Addition with regrouping', observable: true, prerequisites: [{ subskillId: 'SK13.06', prerequisiteType: 'entailment', rationale: 'Basic 2-digit addition precedes 2-digit addition with carry/regrouping' }] },
       { id: 'SK13.08', name: 'Three-digit addition', observable: true, prerequisites: [{ subskillId: 'SK13.07', prerequisiteType: 'entailment' }] },
       { id: 'SK13.09', name: 'Multi-digit addition', observable: true, prerequisites: [{ subskillId: 'SK13.08', prerequisiteType: 'entailment' }] },
