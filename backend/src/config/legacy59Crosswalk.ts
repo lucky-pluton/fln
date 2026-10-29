@@ -81,6 +81,3 @@ export function validateCrosswalkInvariants(): void {
     }
   }
 }
-
-// Run self-check on module load
-validateCrosswalkInvariants();

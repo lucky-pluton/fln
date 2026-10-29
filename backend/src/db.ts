@@ -2020,7 +2020,6 @@ export class DBStore {
                 $or: [
                   { mappedLevel: lvl },
                   ...(targetConceptId ? [{ conceptId: targetConceptId }] : []),
-                  { level: lvl }
                 ]
               }
             },
