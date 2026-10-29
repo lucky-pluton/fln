@@ -1,9 +1,11 @@
 # RUN 1 — Pilot Worksheet Administration & Photography Protocol
 
-**Document Status:** Operational Protocol for RUN 1  
-**Target Group:** Selected Class 2 Vertical Slice Pilot (SK13 Concept Chain, 8–12 concepts)  
-**Dependencies:** Requires signed consent under `docs/pilot/ETHICS_AND_CONSENT_POLICY.md` (#452)  
-**Issue Reference:** Closes #453  
+**Document Status:** DRAFT — Subject to Pilot Slice Selection (#388) and Ethics Clearance (#786/#452)  
+**Target Group:** To be decided in #388 (first pilot targets Balvatika stage)  
+**Dependencies:** Requires signed consent under `docs/pilot/ETHICS_AND_CONSENT_POLICY.md` (#786/#452) and scope determination in #388  
+**Issue Reference:** #453  
+
+> **Note:** This document is maintained as a `DRAFT` operational protocol and remains open until pilot vertical slice selection (#388) and ethics/consent clearance (#786) are finalized.
 
 ---
 
@@ -33,12 +35,12 @@ Before printing or distributing any worksheet in a participating school:
 
 ## 3. Printing & Paper Formatting Specifications
 
-- **Target Chain:** Selected 8–12 concept SK13 pilot chain (Class 2 numeracy, covering place value, regrouping, multiplication basics).
+- **Target Chain:** Class and concept chain to be decided in #388 (first pilot targets the Balvatika stage).
 - **Paper Size:** Standard A4 (210mm x 297mm), 75–80 GSM white paper.
 - **Print Settings:** Single-sided or double-sided depending on page count. High-contrast black-and-white printing (minimum 300 DPI printer resolution).
 - **Header Elements:**
-  - System Worksheet ID (e.g. `WS_C2_BASE_001`) with scannable barcode/QR code anchor.
-  - Student ID field (`STU_C2_XXX`).
+  - System Worksheet ID as printed on the worksheet (e.g. `WS_2118`) with scannable barcode/QR code anchor.
+  - Student ID as printed on the worksheet.
   - Pre-allocated QR alignment anchors at all 4 corners of the page for ICR/OCR rectification.
 
 ---
@@ -80,10 +82,10 @@ To ensure accurate automated ICR/OCR processing and legibility for human evaluat
 Before uploading raw image files to the server repository or shared diagnostic directory:
 
 1. **Aadhaar & Name Masking:** Inspect header region. Ensure student names and Aadhaar numbers are masked (digitally or physically covered) per `ETHICS_AND_CONSENT_POLICY.md` §5.1.
-2. **File Naming Convention:** Name image files using internal pseudonymized IDs:
+2. **File Naming Convention:** Name image files using internal pseudonymized IDs as printed on the worksheet:
    `RUN1_<SchoolUDISE>_<StudentSystemID>_<WorksheetID>_P<PageNum>.jpg`  
-   *Example:* `RUN1_030101001_STU_C2_014_WS_001_P1.jpg`
-3. **Upload Location:** Save raw photo sets to the secure staging directory (`backend/data/uploads/run1_photos/` or designated encrypted pilot cloud bucket).
+   *Example:* `RUN1_030101001_STU_104_WS_2118_P1.jpg`
+3. **Upload Location:** Save raw photo sets to the designated secure pilot storage location (to be determined based on deployment environment).
 
 ---
 
