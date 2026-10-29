@@ -1,13 +1,11 @@
 """
-RETIRED / DEPRECATED (Issue #458)
+DEPRECATED (Issue #458)
 
-This script is retired and preserved for reference only. It runs on a legacy,
+DEPRECATED. To be retired when the remediation plan service (#376) is built; do not extend.
+
+This script is preserved for reference only. It runs on a legacy,
 standalone `class_N` + `phrase_1/2/3` flat-file data model that is disconnected
 from the platform's production MongoDB database and 93-level concept taxonomy.
-
-Production remediation planning and personalized worksheet generation are
-handled by `remediationPlanService` in the Node backend
-(`backend/src/services/remediationPlanService.ts`) and `errorClassification.ts`.
 
 Do not invoke or patch this script for live production evaluation.
 """
@@ -130,15 +128,14 @@ def get_questions_for_subtopic_names(question_bank, subtopic_names):
 
 def run_pipeline(student_id, class_num, phrase, student_name=None):
     warnings.warn(
-        "personalized_evaluation_pipeline.py is retired and disconnected from MongoDB. "
-        "Use backend remediationPlanService instead.",
+        "DEPRECATED. To be retired when the remediation plan service (#376) is built; do not extend.",
         DeprecationWarning,
         stacklevel=2,
     )
     print("=" * 70)
-    print("PERSONALIZED EVALUATION PIPELINE (RETIRED / DEPRECATED — ISSUE #458)")
+    print("PERSONALIZED EVALUATION PIPELINE (DEPRECATED — ISSUE #458)")
     print(f"Student: {student_id} | Class {class_num} | {phrase}")
-    print("Notice: Production backend uses remediationPlanService & errorClassification.ts")
+    print("Notice: DEPRECATED. To be retired when the remediation plan service (#376) is built; do not extend.")
     print("=" * 70)
 
     # --- Load existing reports ---

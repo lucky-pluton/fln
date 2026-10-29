@@ -80,9 +80,9 @@ evaluation_metrics/
 - Falls back to template report if API fails
 - Output: `.txt` report card
 
-### Step 4 — Personalized Exam (`personalized_evaluation_pipeline.py`) — **RETIRED / DEPRECATED (#458)**
-- **Status:** Retired. This standalone Python script ran on a legacy `class_N` / `phrase_1/2/3` flat-file schema disconnected from MongoDB.
-- **Production Replacement:** Remediation planning and personalized exam generation are implemented by `remediationPlanService` (`backend/src/services/remediationPlanService.ts`) and `errorClassification.ts` in the Express backend using the 93-level concept taxonomy.
+### Step 4 — Personalized Exam (`personalized_evaluation_pipeline.py`) — **DEPRECATED (#458)**
+- **Status:** DEPRECATED. To be retired when the remediation plan service (#376) is built; do not extend.
+- This standalone Python script ran on a legacy `class_N` / `phrase_1/2/3` flat-file schema disconnected from MongoDB.
 - Preserved for historical/reference logic only.
 
 ---
